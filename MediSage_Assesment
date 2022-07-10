@@ -1,0 +1,97 @@
+-- PROBLEM NO. 1
+
+WITH result as (
+SELECT *,
+    CASE WHEN host_goals > guest_goals THEN 3 
+        WHEN host_goals = guest_goals THEN 1
+        WHEN host_goals < guest_goals THEN 0
+    END as host_points,
+    CASE WHEN guest_goals > host_goals THEN 3
+        WHEN guest_goals = host_goals THEN 1
+        WHEN guest_goals < host_goals THEN 0 
+    END as guest_points 
+FROM assesment.matches
+)
+
+SELECT
+    t.team_id,
+    t.team_name,
+    COALESCE(y.num_points,0) as num_points
+FROM assesment.teams as t LEFT JOIN (
+    SELECT
+        team_id,
+        SUM(num_points) as num_points
+    FROM (
+        SELECT
+            host_team as team_id,
+            SUM(host_points) as num_points
+        FROM result 
+        GROUP BY 1
+        UNION ALL
+        SELECT
+            guest_team as team_id,
+            SUM(guest_points) as num_points
+        FROM result
+        GROUP BY 1
+        ) x
+    GROUP BY 1
+    ORDER BY 1
+        ) y 
+ON t.team_id = y.team_id 
+ORDER BY 3 DESC, 1 ASC
+
+-- PROBLEM NO. 2
+
+with rank_table as(
+	SELECT 
+		p.project_id,
+		p.employee_id,
+		dense_rank()
+		over(
+			partition by p.project_id
+			ORDER BY e.experience_years DESC
+			) AS rank_col
+	FROM assesment.project as p
+	INNER JOIN assesment.employee as e
+	ON p.employee_id = e.employee_id
+)
+
+SELECT project_id, employee_id 
+FROM rank_table 
+WHERE rank_col = 1
+
+-- PROBLEM NO. 3
+
+select mytable.activity 
+from (
+	  select assesment.friends.activity, 
+	  count(*) as cnt,                       
+	  max(count(*)) over () as maximum_cnt,                   
+	  min(count(*)) over () as minimum_cnt                
+	  from assesment.friends 
+	  group by assesment.friends.activity
+     ) mytable	  
+where cnt not in (maximum_cnt, minimum_cnt);
+
+-- PROBLEM NO. 4
+
+SELECT DISTINCT Student.*
+FROM assesment.student 
+INNER JOIN assesment.exam
+ON student.student_id = exam.student_id
+WHERE student.student_id NOT IN 
+    (
+	 SELECT e1.student_id
+     FROM assesment.exam AS e1 
+		INNER JOIN
+        (
+		SELECT exam_id, 
+		MIN(score) AS min_score, 
+		MAX(score) AS max_score
+        FROM assesment.exam
+        GROUP BY exam_id
+		) AS e2
+    ON e1.exam_id = e2.exam_id
+    WHERE e1.score = e2.min_score OR e1.score = e2.max_score
+	)
+ORDER BY student_id 
